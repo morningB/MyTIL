@@ -400,3 +400,189 @@ public interface IExplodable
 - 인터페이스는 본질적으로 추상적이며 데이터가 없지만 직렬화 사용 가능
 - 인터페이스를 구현하는 구체적인 오브젝트(MonoBehaviour,스크립터블 오브젝트 등)의 레퍼런스를 직렬화
 - 런타임에 is 키워드를 사용하여 직렬화된 오브젝트를 확인하고 캐스트
+
+```csharp
+ // 인터페이스 정의
+public interface IInteractable
+{
+ void Interact();
+}
+// 인터페이스를 구현하는 구상 클래스
+public class DoorController : MonoBehaviour, IInteractable
+{
+ public void Interact()
+ {
+ // 문 로직
+ Debug.Log(“Door opened”);
+ }
+}
+public class GameManager : MonoBehaviour
+{
+ [SerializeField]
+ private MonoBehaviour interactableObject;
+ private void Start()
+ {
+ // 런타임에 확인하고 캐스트
+ if (interactableObject is IInteractable interactable)
+ {
+ interactable.Interact();
+ }
+ }
+} 
+```
+
+### 종속성 역전 원칙
+
+- 정의: **상위 수준의 모듈**이 **하위 수준의 모듈에서 어떤 것도 직접 가져오면 안 된**다고 명시
+    - **양측 모두 추상화의 의존**해아함
+- 클래스간 종속 또는 결합은 약간의 위험성 내포
+- 서로 클래스간 작동 방식을 너무 많이 아는 경우, 수정 시 피해 발생
+    - 결합도가 낮은게 이상적 코드
+- **내부 로직이나 프라이빗 로직**으로 작동하는 객체를 **응집도가 높**다고 함
+- **최고 시나리오: 결합도는 낮게, 응집도는 높게**
+    
+   <img width="702" height="648" alt="Image" src="https://github.com/user-attachments/assets/d04bd58a-2a03-4a08-94b8-8e164cb896da" />
+    
+- 수정과 확장이 쉬워야됨
+    - 힘들다면 구조 다시 설계
+- 종속성 역전 원칙은 결합도를 줄이는 데 도움이 됨
+- 자식 클래스가 부모 클래스에게 의존한다면 SOLID는 이것을 바꾸라고 함
+- 문을 여는 게임 개발
+    
+    <img width="1400" height="803" alt="Image" src="https://github.com/user-attachments/assets/edf07937-70eb-4f10-82e5-052c5e311f00" />
+    
+- 상위 수준에서는 캐릭터가 이동 및 행동  → Switch의 역할
+- Door에 문 열고 닫기가 포함
+
+```csharp
+public class Switch : MonoBehaviour
+{
+ public Door door;
+ public bool isActivated;
+ public void Toggle()
+ {
+ if (isActivated)
+ {
+ isActivated = false;
+ door.Close();
+ }
+ else
+ {
+ isActivated = true;
+ door.Open();
+ }
+ }
+}
+public class Door : MonoBehaviour
+{
+ public void Open()
+ {
+ Debug.Log(“The door is open.”);
+ }
+ public void Close()
+ {
+ Debug.Log(“The door is closed.”);
+ }
+} 
+```
+
+- Toggle의 메서드를 통해 열고 닫기
+- BUT Door에서 Switch로 직접 연결되는 종속 발생
+- Door 외의 다른 항목, 조명 켜기, 로봇 활성화에도 사용되야한다면?
+- Switch에 메서드를 추가할 수 있지만, 개방 폐쇄 원칙을 위반하게 됨
+- 기능 확장 시 원본 코드를 수정해야됨.
+
+→ 추상화로 해결!!! 
+
+- 클래스 사이의 ISwitchable인터페이스를 삽입
+
+<img width="1400" height="1091" alt="Image" src="https://github.com/user-attachments/assets/bbfbdd3c-8b3e-4e4f-adc8-fc35ad0c6c96" />
+
+- ISwitchable에 필요한 것은 액티브 상태인지 알기 위한 public 프로퍼티와 Activate 및 Deactivate
+
+```csharp
+public interface ISwitchable 
+{
+ public bool IsActive { get; }
+ public void Activate();
+ public void Deactivate();
+}
+```
+
+- Door에 의존하지 않고 ISwitchable에 의존하게 됨
+
+```csharp
+public class Switch : MonoBehaviour
+{
+ public ISwitchable client;
+ public void Toggle()
+ {
+ if (client.IsActive)
+ {
+ client.Deactivate();
+ }
+ else
+ {
+ client.Activate();
+ }
+ }
+```
+
+- ISwitchable 를 구현하려면 Door도 재작업 해야됨
+
+```csharp
+public class Door : MonoBehaviour, ISwitchable
+{
+ private bool isActive;
+ public bool IsActive => isActive;
+ public void Activate()
+ {
+ isActive = true;
+ Debug.Log(“The door is open.”);
+ }
+ public void Deactivate()
+ {
+ isActive = false;
+ Debug.Log(“The door is closed.”);
+ }
+} 
+```
+
+- 종속성 역전!!!
+- 인터페이스가 Switch를 door에 고정하지 않고 둘 사이의 추상화를 형성
+- 특정 메서드(Open과 Close)에 의존하지 않는다
+- 재사용성이 향상되며, 클래스를 더 많이 생성 가능
+
+<img width="1400" height="996" alt="Image" src="https://github.com/user-attachments/assets/0697ec24-081a-4ef2-84a5-db0a8479d487" />
+
+- 양측 모두 추상화에 의존해야됨.
+
+### 인터페이스 VS 추상 클래스
+
+- abstract 키워드를 사용해 클래스 정의 가능
+- 직접적인 인스턴스화할 수 없음
+- 추상클래스로 문 구현하기
+
+<img width="1351" height="961" alt="Image" src="https://github.com/user-attachments/assets/2fc5bb7d-1a15-4e8a-b185-b5f8ffc60da4" />
+
+- 상속은 Is -a, 핵심 기능을 공유 가능
+- 다중 상속 불가!
+
+### 인터페이스
+
+- 상속 패러다임에 부합하지 않다면 더 유연함을 제공
+- 선언만 존재, 다중 구현 가능
+
+<img width="1351" height="943" alt="Image" src="https://github.com/user-attachments/assets/dd04101d-e42e-4660-ab3b-b722a1b0d85c" />
+
+<img width="663" height="342" alt="Image" src="https://github.com/user-attachments/assets/69c5590d-90f5-4c0b-8bbc-139d1b2eee83" />
+
+### SOILD 원칙의 이해(요약)
+
+- **단일 책임**: 클래스는 단 하나의 작업만 수행하고 단 하나의 이유로만 변경 가능
+- **개방-폐쇄**: 기존 작동 방식을 변경하지 않고 클래스의 기능을 확장할 수 있어야 합니다.
+- **리스코프 치환**: 서브 클래스는 부모 클래스로 대체 가능
+- **인터페이스 분리**: 인터페이스는 최소한의 메서드로 짧게 유지하세요. 클라이언트는 필요한 항목만
+구현합니다.
+- **종속성 역전**: 추상화에 의존하세요. 하나의 구상 클래스에서 다른 구상 클래스로 직접 의존하지
+말아야 합니다.
