@@ -103,3 +103,81 @@ public class ConcreteFactoryA : Factory
 - 생성, 파괴 대신 미리 초기화하고 비활성화된 오브젝트의 푸ㄹ을 유지하는 것
     - 인스턴스화 필요 없음
 - ParticleSystem이 오브젝트 풀과 유사
+- 오브젝트 풀의 크기를 설명하거나 프리팹에 대한 설명, 풀 자체를 형성할 컬렉션을 설정
+
+```csharp
+public class ObjectPool : MonoBehaviour
+{
+	 [SerializeField] private int initPoolSize;
+	 [SerializeField] private PooledObject objectToPool;
+	 // 풀링된 오브젝트를 컬렉션에 저장
+	 private Stack<PooledObject> stack;
+	 private void Start()
+	 {
+		 SetupPool();
+	 }
+	 // 풀 생성(지연을 인지할 수 없을 때 호출)
+	 private void SetupPool()
+	 {
+		 stack = new Stack<PooledObject>();
+		 PooledObject instance = null;
+		 for (int i = 0; i < initPoolSize; i++)
+		 {
+			 instance = Instantiate(objectToPool);
+			 instance.Pool = this;
+			 instance.gameObject.SetActive(false);
+			 stack.Push(instance);
+		 }
+	 }
+	  // 풀에서 첫 번째 액티브 게임 오브젝트를 반환합니다.
+	 public PooledObject GetPooledObject()
+	 {
+		 // 풀이 충분히 크지 않으면 새로운 PooledObjects를 인스턴스화
+		 if (stack.Count == 0)
+		 {
+			 PooledObject newInstance = Instantiate(object ToPool);
+			 newInstance.Pool = this;
+			 return newInstance;
+		 }
+	 // 그렇지 않으면 목록에서 다음 항목을 가져옵니다.
+		 PooledObject nextInstance = stack.Pop();
+		 nextInstance.gameObject.SetActive(true);
+		 return nextInstance;
+	 }
+	 public void ReturnToPool(PooledObject PooledObject)
+	 {
+		 stack.Push(PooledObject);
+		 PooledObject.gameObject.SetActive(false);
+	 }
+}
+```
+
+- `SetupPool` 로 오브젝트 풀 채우기
+    - 인스턴스로 만들고, 이를 스택에 넣는다.
+- `GetPooledObject` 이 비어있다면 새로운 풀을 생성
+- `GetPooledObject` 를 호출하는 클라이언트는 풀링된 오브젝트를 회전/이동시켜야함
+
+```csharp
+public class PooledObject : MonoBehaviour
+{
+ private ObjectPool pool;
+ public ObjectPool Pool { get => pool; set => pool = value; }
+ public void Release()
+ {
+	 pool.ReturnToPool(this);
+ }
+} 
+```
+
+- `ObjectPool`을 참조하기 위한 작은 `PooledObject`를 가짐
+- `ReturnToPool` 을 호출하면 오브젝트가 비활성화 되고 풀 대기열로 반환
+
+- 이것처럼 하면 사용자는 총알을 생성하는 대신 오브젝트 풀 메서드를 호출
+
+<img width="1357" height="1038" alt="Image" src="https://github.com/user-attachments/assets/b03ec051-f9e7-40e6-9de5-e0357c59ae1a" />
+
+ 풀링된 오브젝트 비활성화 및 재사용
+
+- 수백의 총알 발사 연출처럼 보임
+- 실제로는 총알을 비활성화하고 재사용하는 것
+- 풀의 크기는 활성화된 오브젝트를 동시에 표시할 수 있을만큼 커야함.
