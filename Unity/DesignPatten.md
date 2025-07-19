@@ -13,14 +13,14 @@
 ```csharp
 public interface IProduct
 {
- public string ProductName { get; set; }
- public void Initialize();
+	public string ProductName { get; set; }
+	public void Initialize();
 }
 public abstract class Factory : MonoBehaviour
 {
- public abstract IProduct GetProduct(Vector3 position);
- // 모든 공장이 공유하는 메서드
- …
+	public abstract IProduct GetProduct(Vector3 position);
+	// 모든 공장이 공유하는 메서드
+	…
 } 
 ```
 
@@ -40,32 +40,31 @@ public abstract class Factory : MonoBehaviour
 ```csharp
 public class ProductA : MonoBehaviour, IProduct
 {
- [SerializeField] private string productName = “ProductA”;
- public string ProductName { get => productName; set => productName
- = value ; }
- private ParticleSystem particleSystem;
- public void Initialize()
- {
- // 이 제품에 대한 모든 고유 로직
- gameObject.name = productName;
- particleSystem = GetComponentInChildren<ParticleSystem>();
- particleSystem?.Stop();
- particleSystem?.Play();
- }
+	[SerializeField] private string productName = “ProductA”;
+	public string ProductName { get => productName; set => productName = value ; }
+	private ParticleSystem particleSystem;
+	public void Initialize()
+	{
+		// 이 제품에 대한 모든 고유 로직
+		gameObject.name = productName;
+		particleSystem = GetComponentInChildren<ParticleSystem>();
+		particleSystem?.Stop();
+		particleSystem?.Play();
+	}
 }
 public class ConcreteFactoryA : Factory
 {
- [SerializeField] private ProductA productPrefab;
- public override IProduct GetProduct(Vector3 position)
- {
- // 프리팹 인스턴스를 생성하고 제품 컴포넌트 가져오기
- GameObject instance = Instantiate(productPrefab.gameObject,
- position, Quaternion.identity);
- ProductA newProduct = instance.GetComponent<ProductA>();
- // 각 제품에 자체 로직 포함
- newProduct.Initialize();
- return newProduct;
- }
+	[SerializeField] private ProductA productPrefab;
+	public override IProduct GetProduct(Vector3 position)
+	{
+	// 프리팹 인스턴스를 생성하고 제품 컴포넌트 가져오기
+		GameObject instance = Instantiate(productPrefab.gameObject,
+		position, Quaternion.identity);
+		ProductA newProduct = instance.GetComponent<ProductA>();
+		// 각 제품에 자체 로직 포함
+		newProduct.Initialize();
+		return newProduct;
+	}
 }
 ```
 
@@ -160,12 +159,12 @@ public class ObjectPool : MonoBehaviour
 ```csharp
 public class PooledObject : MonoBehaviour
 {
- private ObjectPool pool;
- public ObjectPool Pool { get => pool; set => pool = value; }
- public void Release()
- {
-	 pool.ReturnToPool(this);
- }
+	private ObjectPool pool;
+	public ObjectPool Pool { get => pool; set => pool = value; }
+	public void Release()
+	{
+		pool.ReturnToPool(this);
+	}
 } 
 ```
 
@@ -181,3 +180,112 @@ public class PooledObject : MonoBehaviour
 - 수백의 총알 발사 연출처럼 보임
 - 실제로는 총알을 비활성화하고 재사용하는 것
 - 풀의 크기는 활성화된 오브젝트를 동시에 표시할 수 있을만큼 커야함.
+
+### UnityEngine.Pool
+
+- Unity 내부에서 자체적으로 만듬
+
+```csharp
+public class RevisedGun : MonoBehaviour
+{
+	…
+	// Unity 2021 이상 버전에서 사용 가능한 스택 기반 ObjectPool
+	private IObjectPool<RevisedProjectile> ObjectPool;
+	// 이미 풀에 있는 기존 항목을 반환하려 할 때 예외를 반환
+	[SerializeField] private bool collectionCheck = true;
+	// 풀의 용량과 최대 크기를 제어하는 추가 옵션
+	[SerializeField] private int defaultCapacity = 20;
+	[SerializeField] private int maxSize = 100;
+	private void Awake()
+	{
+		ObjectPool = new ObjectPool<RevisedProjectile>
+		(CreateProjectile,OnGetFromPool, OnReleaseToPool, OnDestroyPooledObject, collectionCheck, defaultCapacity, maxSize);
+	}
+	// 오브젝트 풀을 채울 항목을 만들 때 호출됨
+	private RevisedProjectile CreateProjectile()
+	{
+		RevisedProjectile projectileInstance = Instantiate(projectilePrefab);
+		projectileInstance.ObjectPool = ObjectPool;
+		return projectileInstance;
+	}
+	// 오브젝트 풀로 항목을 반환할 때 호출됨
+	private void OnReleaseToPool(RevisedProjectile PooledObject)
+	{
+		PooledObject.gameObject.SetActive(false);
+	}
+	// 오브젝트 풀에서 다음 항목을 검색할 때 호출됨
+	private void OnGetFromPool(RevisedProjectile PooledObject)
+	{
+		PooledObject.gameObject.SetActive(true);
+	}
+	// 풀링된 항목의 최대 개수를 초과할 때 호출됨(풀링된 오브젝트 파괴)
+	private void OnDestroyPooledObject(RevisedProjectile PooledObject)
+	{
+		Destroy(PooledObject.gameObject);
+	}
+	private void FixedUpdate()
+	{
+	…
+	}
+}
+```
+
+- 스크립트 내용의 대부분이 원본 ExampleGun 스크립트에서 작동합니다.
+- 하지만 이제 다음 시점에 로직을 설정하는 유용한 기능이 ObjectPool 생성자에 포함됩니다.
+— 풀을 채우기 위해 풀링된 항목을 먼저 생성하기
+— 풀에서 항목 가져오기
+— 풀로 항목 반환하기
+— 풀링된 오브젝트 파괴하기(예: 최대 한도에 도달한 경우)
+
+이제 생성자로 전달할 해당 메서드를 정의해야 합니다.
+빌트인 ObjectPool에서 어떤 식으로 기본 풀 크기 및 최대 풀 크기 옵션도 포함하는지 참고하세요. 최대 풀
+크기를 초과하는 항목은 자동 파괴 행동을 트리거하여 메모리 사용량을 억제합니다.
+발사체 스크립트는 ObjectPool에 레퍼런스를 유지하도록 일부 수정됩니다. 이렇게 하면 오브젝트를 풀로
+더 간편하게 릴리스할 수 있습니다.
+
+```csharp
+public class RevisedProjectile : MonoBehaviour
+{
+	private IObjectPool<RevisedProjectile> ObjectPool;
+	// 발사체에 ObjectPool에 대한 레퍼런스를 제공하는 공용 프로퍼티
+	public IObjectPool<RevisedProjectile> ObjectPool { set => object Pool = value; }
+} 
+```
+
+장점과 단점
+오브젝트 풀은 성능을 최적화하는 강력한 도구지만 모든 디자인 패턴에는 고려해야 할 사항이 있다는 점을
+유의하세요.
+오브젝트 풀의 장점은 다음과 같습니다.
+— 가비지 컬렉션 오버헤드 감소: 오브젝트를 생성 및 파괴하지 않고 재사용하면 가비지 컬렉션의
+필요성이 줄어듭니다. 따라서 런타임에 성능 스파이크나 끊김 현상을 방지할 수 있습니다.
+
+— 성능 향상: 오브젝트를 미리 초기화하고 필요할 때마다 다시 활성화하면 슈팅 게임처럼 페이스가 빠른
+게임에서 성능을 향상할 수 있습니다.
+— 초기화 과정 최적화: 오브젝트 생성 과정을 덜 중요한 시점으로 분산하여 리소스 및 애플리케이션 시작
+시간을 최적화할 수 있습니다.
+하지만 다음과 같은 단점도 있습니다.
+— 복잡도 증가: 오브젝트 풀에는 더 많은 관리가 필요합니다. 오브젝트를 적절히 초기화하고 릴리스하지
+않으면 오류나 버그가 발생할 수 있습니다.
+— 메모리 사용량: 오브젝트 풀을 사용하면 가비지 컬렉션이 줄어들지만 정적 메모리 사용량이 늘어날 수
+있습니다. 오브젝트 풀은 오브젝트를 사용하지 않을 때도 사전 정의된 만큼의 오브젝트를 메모리에
+저장합니다. 프로젝트 수요에 따라 적절하게 풀 크기를 조정해야 합니다.
+— 관리 필요성 증가: 최적의 오브젝트 풀 크기를 결정하는 일은 어려울 수 있습니다. 풀이
+
+개선 방안
+위에서의 예시는 단순한 편이었습니다. 오브젝트 풀을 실제 프로젝트에 배포할 때는 다음과 같이
+업그레이드해 보세요.
+— 정적 또는 싱글톤으로 설정: 다양한 소스에서 풀링된 오브젝트를 생성해야 하는 경우에는 오브젝트
+풀을 정적으로 재사용할 수 있도록 설정해 보세요. 그러면 애플리케이션의 어디에서든 액세스할 수
+있으나, 인스펙터 사용은 불가능합니다. 또는 오브젝트 풀 패턴을 싱글톤으로 설정하면 어디에서든
+액세스하여 간편하게 사용할 수 있습니다.
+— 딕셔너리로 다수의 풀 관리: 많은 수의 다양한 프리팹을 풀링해야 하는 경우, 개별적인 풀에 저장하고
+키-값 페어를 저장하면 쿼리할 풀을 알 수 있습니다(프리팹의 InstanceID는 고유 키로 작동할 수
+있음).
+— 사용되지 않는 게임 오브젝트를 창의적으로 제거: 오브젝트 풀을 효과적으로 활용하는 방법 중
+하나는 사용되지 않는 오브젝트를 숨기고 풀로 반환하는 것입니다. 가능한 기회를 모두 활용해 풀링된
+오브젝트(화면 바깥에 있거나 폭발에 의해 숨겨진 오브젝트 등)를 비활성화하세요.
+— 오류 확인: 이미 풀에 있는 오브젝트를 릴리스하지 마세요. ObjectPool<T>의 인스턴스를 생성할 때
+collectionCheck 파라미터를 true로 설정할 수 있습니다. 이렇게 하면 이미 풀에 있는 오브젝트를
+반환하려 할 때 에디터에서 예외가 발생합니다.
+— 최대 크기/제한 추가: 풀링된 오브젝트가 많으면 메모리를 소모합니다. ObjectPool 생성자의
+maxSize 파라미터를 사용하여 풀 크기를 제한하세요.
