@@ -300,3 +300,70 @@ public class RevisedProjectile : MonoBehaviour
     - 해당하는 하나의 인스턴스에 대한 글로벌 액세스 제공
 - 전체 씬에서 행동을 조정하는 오브젝트가 정확히 하나만 필요할 때 유용
 - 예를 들면 씬에 메인 게임 루프를 총괄하는 게임 관리자가 딱 하나만 필요
+
+- 만드는 방법
+
+```csharp
+public class SimpleSingleton : MonoBehaviour
+{
+	public static SimpleSingleton Instance;
+	private void Awake()
+	{
+		if (Instance == null)
+		{
+			Instance = this; 
+		}
+		else
+		{
+			Destroy(gameObject); 
+		}
+	}
+}
+```
+- 기존에 존재한다면 제거
+- 싱글톤 문제점
+	- 계층 구조에서 싱글톤을 설정해야됨
+	- 보통 관리자 역할을 하므로 DontDestroyOnLoad를 사용하여 지속성을 가지게 함
+- 지연 인스턴스를 통해 자동으로 생성
+- 개선된 싱글톤 패턴
+```csharp
+public class Singleton : MonoBehaviour
+{
+	private static Singleton Instance;
+	public static Singleton Instance
+	{
+		get
+			{
+				if (Instance == null)
+				{
+					SetupInstance();
+				}
+				return Instance;
+			}
+	}
+	
+	private void Awake()
+	{
+		if (Instance == null)
+		{
+			Instance = this;
+			DontDestroyOnLoad(this.gameObject);
+		}
+		else
+		{
+			Destroy(gameObject);
+		}
+	}
+	private static void SetupInstance()
+	{
+		Instance = FindObjectOfType<Singleton>();
+		if (Instance == null)
+		{
+			GameObject gameObj = new GameObject();
+			gameObj.name = “Singleton”;
+			Instance = gameObj.AddComponent<Singleton>();
+			DontDestroyOnLoad(gameObj);
+		}
+	}
+}
+```
